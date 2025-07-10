@@ -165,7 +165,7 @@ def generar_cuenta():
             day = int(match.group(3))
             hour = int(match.group(4))
             minute = int(match.group(5))
-            second = int(match.group(6))
+            second = int(match.group(6))#
             # El último grupo (7) puede ser un contador, lo ignoramos para la fecha
             fecha_original = datetime(year, month, day, hour, minute, second)
             fecha_final = fecha_original + timedelta(days=14)
