@@ -125,7 +125,7 @@ def generar_cuenta():
         "locale":"es-ES",
         "dateOfBirth": f"{fecha_nacimiento}T00:00:00.000Z",
         "tos": True,
-        "campaignId": "1j4E1vAzx2blwpjL4tPcNp",
+        "campaignId": "", #DEJARLO VACÍO
         "ageConfirmation": True
     }
 
