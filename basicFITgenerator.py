@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-import requests, sys, signal, time, colorama, json, re, os, string, random, argparse
+import requests, sys, signal, time, colorama, json, re, os, string, random, argparse,warnings
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from colorama import Fore, Style, init
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
@@ -10,6 +11,8 @@ import qrcode
 from PIL import Image
 from io import BytesIO
 import base64
+
+warnings.simplefilter('ignore', InsecureRequestWarning)
 init()
 
 def sig_handler(sig, frame):
@@ -91,14 +94,14 @@ def generar_cuenta():
     session = requests.Session()
 
     #CREAR CORREO
-    result = session.get(f"{mail_url}/domains") #Sacamos dominio de correo
+    result = session.get(f"{mail_url}/domains",verify=False) #Sacamos dominio de correo
     vprint(Fore.MAGENTA + f"[DEBUG] Respuesta dominios: {result.text}")
     result_dict= json.loads(result.text)
     mail_domain = result_dict['hydra:member'][0]['domain']
     userID = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(12)) #Generamos ID de usuario aleatorio
     email = f"{userID}@{mail_domain}" #Generamos correo aleatorio
     payload= {"address" : f"{email}" , "password" : f"{password}"}
-    result = session.post(f"{mail_url}/accounts", json=payload, headers=header ,timeout=5)
+    result = session.post(f"{mail_url}/accounts", json=payload, headers=header ,timeout=5,verify=False)
     vprint(Fore.MAGENTA + f"[DEBUG] Respuesta creación cuenta mail: {result.text}")
     if result.status_code == 201:
         print(Fore.YELLOW + "[1] Mail Desechable Creado")
@@ -107,7 +110,7 @@ def generar_cuenta():
         return False
 
     #EXTRAER TOKEN
-    result = session.post(f"{mail_url}/token",json=payload,headers=header,timeout=5)
+    result = session.post(f"{mail_url}/token",json=payload,headers=header,timeout=5,verify=False)
     vprint(Fore.MAGENTA + f"[DEBUG] Respuesta token: {result.text}")
     result_dict= json.loads(result.text) #Crea un diccionario con el resultado en formato json
     token= result_dict['token'] #Del diccionario selecciona el token
@@ -129,7 +132,7 @@ def generar_cuenta():
         "ageConfirmation": True
     }
 
-    result = session.post(basic_url, json=body, headers=headers, timeout=5)
+    result = session.post(basic_url, json=body, headers=headers, timeout=5,verify=False)
     vprint(Fore.MAGENTA + f"[DEBUG] Respuesta creación Basic-Fit: {result.text}")
     if result.status_code == 200:
         print(Fore.YELLOW + "[3] Cuenta Basic-Fit Creada")
@@ -139,12 +142,12 @@ def generar_cuenta():
 
     #EXTRAER QR DEL CORREO
     print(Fore.YELLOW + "[⏳] Esperando a recibir el correo con el QR...")
-    time.sleep(30) 
-    result = session.get(f"{mail_url}/messages",headers={"Content-Type":"application/json", "Authorization": f"Bearer {token}"},timeout=5)
+    time.sleep(30)
+    result = session.get(f"{mail_url}/messages",headers={"Content-Type":"application/json", "Authorization": f"Bearer {token}"},timeout=5,verify=False)
     vprint(Fore.MAGENTA + f"[DEBUG] Respuesta mensajes: {result.text}")
     result_dict= json.loads(result.text)
     url_source = result_dict['hydra:member'][0]['downloadUrl'] #Accedemos al primer elemento de la lista hydra:member y extraemos downloadURL
-    result = session.get(f"{mail_url}{url_source}",headers={"Content-Type":"application/json", "Authorization": f"Bearer {token}"},timeout=5)
+    result = session.get(f"{mail_url}{url_source}",headers={"Content-Type":"application/json", "Authorization": f"Bearer {token}"},timeout=5,verify=False)
     vprint(Fore.MAGENTA + f"[DEBUG] Respuesta mensaje QR: {result.text}")
     qr_url = re.findall(r'https?://[^\s"\'<>]*qr-code-generator[^\s"\'<>]*', result.text)
     print(Fore.GREEN + "[🏆] QR conseguido")
@@ -157,19 +160,16 @@ def generar_cuenta():
     vprint(Fore.MAGENTA + f"[DEBUG] Respuesta descarga QR: {qr_response.status_code}")
     if qr_response.status_code == 200:
         # Extraer el parámetro tipo D250706123227173 del enlace
-        match = re.search(r"D(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", qr_url[0])
+        match = re.search(r"D(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", qr_url[0])
         if match:
-            # Parsear la fecha y sumar 14 días
-            year = int('20' + match.group(1))
-            month = int(match.group(2))
-            day = int(match.group(3))
-            hour = int(match.group(4))
-            minute = int(match.group(5))
-            second = int(match.group(6))#
-            # El último grupo (7) puede ser un contador, lo ignoramos para la fecha
-            fecha_original = datetime(year, month, day, hour, minute, second)
-            fecha_final = fecha_original + timedelta(days=14)
-            nombre_archivo = fecha_final.strftime('%Y%m%d%H%M%S') + '.png'
+            # Construir fecha en formato YYYYMMDD_HHMM
+            year = '20' + match.group(1)  # "25" -> "2025"
+            month = match.group(2)        # "07"
+            day = match.group(3)          # "06"
+            hour = match.group(4)         # "12"
+            minute = match.group(5)       # "32"
+            fecha_str = f"{year}{month}{day}_{hour}{minute}"
+            nombre_archivo = f"{fecha_str}.png"
         else:
             nombre_archivo = 'qr_sin_fecha.png'
         # Crear carpeta basicQRs en el directorio anterior si no existe
@@ -185,7 +185,7 @@ def generar_cuenta():
     else:
         print(Fore.RED + "[❗] Error al descargar el QR")
         return False
-    
+
     return True
 
 # Bucle principal
