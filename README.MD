@@ -17,7 +17,7 @@ Generador automático de códigos QR para Basic-FIT con soporte para ejecución 
 
 1. Clona este repositorio:
 ```bash
-git clone https://github.com/tu-usuario/basicFITgenerator.git
+git clone https://github.com/ImM0B/basicFITgenerator.git
 cd basicFITgenerator
 ```
 
