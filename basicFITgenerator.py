@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-
-import requests, sys, signal, time, colorama, json, re, os, string, random, argparse,warnings
+import requests, sys, signal, time, colorama, json, re, os, string, random, argparse, warnings
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from colorama import Fore, Style, init
 from bs4 import BeautifulSoup
@@ -11,30 +10,22 @@ import qrcode
 from PIL import Image
 from io import BytesIO
 import base64
-
 warnings.simplefilter('ignore', InsecureRequestWarning)
 init()
 
 def sig_handler(sig, frame):
     print(Fore.RED + "\n\n[!] Saliendo...\n")
     sys.exit(0)
-
 signal.signal(signal.SIGINT, sig_handler)
 
-# Configuración de argumentos
 class ColoredHelpFormatter(argparse.RawDescriptionHelpFormatter):
     def _format_action(self, action):
-        # Colorear el nombre del argumento
         if action.option_strings:
             action.help = Fore.CYAN + action.help + Style.RESET_ALL
         return super()._format_action(action)
-
     def _format_usage(self, usage, actions, groups, prefix):
-        # Colorear el texto de uso
         return Fore.YELLOW + super()._format_usage(usage, actions, groups, prefix) + Style.RESET_ALL
-
     def _format_text(self, text):
-        # Colorear la descripción y epílogo
         if text:
             return Fore.GREEN + text + Style.RESET_ALL
         return text
@@ -44,32 +35,33 @@ parser = argparse.ArgumentParser(
     formatter_class=ColoredHelpFormatter,
     epilog=Fore.YELLOW + '''
 Ejemplos de uso:
-  python basicFITgenerator.py              # Usa valores por defecto
-  python basicFITgenerator.py -t 12        # Ejecuta cada 12 horas
-  python basicFITgenerator.py -n "Juan" -l "García" -d "1995-05-15"  # Personaliza datos
+  python basicFITgenerator.py                          # Usa valores por defecto
+  python basicFITgenerator.py -t 12                    # Ejecuta cada 12 horas
+  python basicFITgenerator.py -e tuemail@gmail.com     # Usa correo personalizado
+  python basicFITgenerator.py -n "Juan" -l "García" -d "1995-05-15"
 ''' + Style.RESET_ALL)
 
-parser.add_argument('-t', '--time', type=int, help='Tiempo en horas entre cada generación (por defecto: 8)')
-parser.add_argument('-n', '--name', type=str, help='Nombre para la cuenta (por defecto: Joan)')
+parser.add_argument('-t', '--time',     type=int, help='Tiempo en horas entre cada generación (por defecto: 8)')
+parser.add_argument('-n', '--name',     type=str, help='Nombre para la cuenta (por defecto: Joan)')
 parser.add_argument('-l', '--lastname', type=str, help='Apellido para la cuenta (por defecto: Pradells)')
-parser.add_argument('-d', '--date', type=str, help='Fecha de nacimiento en formato YYYY-MM-DD (por defecto: 1996-12-23)')
-parser.add_argument('-v', '--verbose', action='store_true', help='Muestra información detallada del proceso')
-
+parser.add_argument('-d', '--date',     type=str, help='Fecha de nacimiento en formato YYYY-MM-DD (por defecto: 1996-12-23)')
+parser.add_argument('-e', '--email',    type=str, help='Correo personalizado para el registro (omite la creación del mail desechable)')
+parser.add_argument('-v', '--verbose',  action='store_true', help='Muestra información detallada del proceso')
 args = parser.parse_args()
 
 # Valores por defecto
-intervalo_horas = args.time if args.time else 8
-nombre = args.name if args.name else "Joan"
-apellido = args.lastname if args.lastname else "Pradells"
-fecha_nacimiento = args.date if args.date else "1996-12-23"
-verbose = args.verbose
+intervalo_horas   = args.time     if args.time     else 8
+nombre            = args.name     if args.name     else "Joan"
+apellido          = args.lastname if args.lastname else "Pradells"
+fecha_nacimiento  = args.date     if args.date     else "1996-12-23"
+verbose           = args.verbose
 
-# Variables
-mail_url= "https://api.mail.tm"
-basic_url= "https://member.basic-fit.com/api/signUpForm/signUp"
-password = "basicbasicFIT1234" #Contraseña por defecto para el correo desechable
-header={"Content-Type":"application/json"}
-headers = {
+# Variables globales
+mail_url   = "https://api.mail.tm"
+basic_url  = "https://member.basic-fit.com/api/signUpForm/signUp"
+password   = "basicbasicFIT1234"
+header     = {"Content-Type": "application/json"}
+headers    = {
     "Cookie": "bf-locale=es-ES; bf-country=ES",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
     "Accept": "*/*",
@@ -90,49 +82,56 @@ def animacion_espera():
         time.sleep(0.1)
 
 def generar_cuenta():
-    #MAIN
     session = requests.Session()
+    email_personalizado = args.email
 
-    #CREAR CORREO
-    result = session.get(f"{mail_url}/domains",verify=False) #Sacamos dominio de correo
-    vprint(Fore.MAGENTA + f"[DEBUG] Respuesta dominios: {result.text}")
-    result_dict= json.loads(result.text)
-    mail_domain = result_dict['hydra:member'][0]['domain']
-    userID = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(12)) #Generamos ID de usuario aleatorio
-    email = f"{userID}@{mail_domain}" #Generamos correo aleatorio
-    payload= {"address" : f"{email}" , "password" : f"{password}"}
-    result = session.post(f"{mail_url}/accounts", json=payload, headers=header ,timeout=5,verify=False)
-    vprint(Fore.MAGENTA + f"[DEBUG] Respuesta creación cuenta mail: {result.text}")
-    if result.status_code == 201:
-        print(Fore.YELLOW + "[1] Mail Desechable Creado")
+    if email_personalizado:
+        # ── CORREO PERSONALIZADO ──────────────────────────────────────────────
+        email = email_personalizado
+        token = None
+        print(Fore.YELLOW + f"[1] Usando correo personalizado: {email}")
+        print(Fore.YELLOW + "[2] Se omite la creación de mail desechable y token")
     else:
-        print(Fore.RED + "\n[❗] Fallo al crear el Mail")
-        return False
+        # ── CREAR CORREO DESECHABLE ───────────────────────────────────────────
+        result = session.get(f"{mail_url}/domains", verify=False)
+        vprint(Fore.MAGENTA + f"[DEBUG] Respuesta dominios: {result.text}")
+        result_dict  = json.loads(result.text)
+        mail_domain  = result_dict['hydra:member'][0]['domain']
+        userID       = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(12))
+        email        = f"{userID}@{mail_domain}"
+        payload      = {"address": f"{email}", "password": f"{password}"}
 
-    #EXTRAER TOKEN
-    result = session.post(f"{mail_url}/token",json=payload,headers=header,timeout=5,verify=False)
-    vprint(Fore.MAGENTA + f"[DEBUG] Respuesta token: {result.text}")
-    result_dict= json.loads(result.text) #Crea un diccionario con el resultado en formato json
-    token= result_dict['token'] #Del diccionario selecciona el token
-    if result.status_code == 200:
-        print(Fore.YELLOW + "[2] Token Extraído")
-    else:
-        print(Fore.RED + "\n[❗] Fallo al extraer el Token")
-        return False
+        result = session.post(f"{mail_url}/accounts", json=payload, headers=header, timeout=5, verify=False)
+        vprint(Fore.MAGENTA + f"[DEBUG] Respuesta creación cuenta mail: {result.text}")
+        if result.status_code == 201:
+            print(Fore.YELLOW + "[1] Mail Desechable Creado")
+        else:
+            print(Fore.RED + "\n[❗] Fallo al crear el Mail")
+            return False
 
-    #CREAR CUENTA BASICFIT
+        # ── EXTRAER TOKEN ─────────────────────────────────────────────────────
+        result      = session.post(f"{mail_url}/token", json=payload, headers=header, timeout=5, verify=False)
+        vprint(Fore.MAGENTA + f"[DEBUG] Respuesta token: {result.text}")
+        result_dict = json.loads(result.text)
+        token       = result_dict['token']
+        if result.status_code == 200:
+            print(Fore.YELLOW + "[2] Token Extraído")
+        else:
+            print(Fore.RED + "\n[❗] Fallo al extraer el Token")
+            return False
+
+    # ── CREAR CUENTA BASICFIT ─────────────────────────────────────────────────
     body = {
-        "firstName": nombre,
-        "lastName": apellido,
-        "email": f"{email}",
-        "locale":"es-ES",
-        "dateOfBirth": f"{fecha_nacimiento}T00:00:00.000Z",
-        "tos": True,
-        "campaignId": "", #DEJARLO VACÍO
+        "firstName":       nombre,
+        "lastName":        apellido,
+        "email":           f"{email}",
+        "locale":          "es-ES",
+        "dateOfBirth":     f"{fecha_nacimiento}T00:00:00.000Z",
+        "tos":             True,
+        "campaignId":      "",
         "ageConfirmation": True
     }
-
-    result = session.post(basic_url, json=body, headers=headers, timeout=5,verify=False)
+    result = session.post(basic_url, json=body, headers=headers, timeout=5, verify=False)
     vprint(Fore.MAGENTA + f"[DEBUG] Respuesta creación Basic-Fit: {result.text}")
     if result.status_code == 200:
         print(Fore.YELLOW + "[3] Cuenta Basic-Fit Creada")
@@ -140,46 +139,63 @@ def generar_cuenta():
         print(Fore.RED + "\n[❗] Fallo al crear la cuenta Basic-Fit")
         return False
 
-    #EXTRAER QR DEL CORREO
+    # ── OBTENER QR ────────────────────────────────────────────────────────────
+    if email_personalizado:
+        print(Fore.CYAN  + f"\n[📧] El QR será enviado a: {email}")
+        print(Fore.YELLOW + "[⚠️]  Revisa tu bandeja de entrada (y spam) para obtener el código QR.")
+        return True
+
+    # Lógica original: esperar y extraer QR del mail desechable
     print(Fore.YELLOW + "[⏳] Esperando a recibir el correo con el QR...")
     time.sleep(30)
-    result = session.get(f"{mail_url}/messages",headers={"Content-Type":"application/json", "Authorization": f"Bearer {token}"},timeout=5,verify=False)
+
+    result = session.get(
+        f"{mail_url}/messages",
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
+        timeout=5, verify=False
+    )
     vprint(Fore.MAGENTA + f"[DEBUG] Respuesta mensajes: {result.text}")
-    result_dict= json.loads(result.text)
-    url_source = result_dict['hydra:member'][0]['downloadUrl'] #Accedemos al primer elemento de la lista hydra:member y extraemos downloadURL
-    result = session.get(f"{mail_url}{url_source}",headers={"Content-Type":"application/json", "Authorization": f"Bearer {token}"},timeout=5,verify=False)
+    result_dict = json.loads(result.text)
+    url_source  = result_dict['hydra:member'][0]['downloadUrl']
+
+    result = session.get(
+        f"{mail_url}{url_source}",
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
+        timeout=5, verify=False
+    )
     vprint(Fore.MAGENTA + f"[DEBUG] Respuesta mensaje QR: {result.text}")
     qr_url = re.findall(r'https?://[^\s"\'<>]*qr-code-generator[^\s"\'<>]*', result.text)
+
+    if not qr_url:
+        print(Fore.RED + "[❗] No se encontró el enlace del QR en el correo")
+        return False
+
     print(Fore.GREEN + "[🏆] QR conseguido")
-    print(Fore.CYAN + "[🔗] Enlace al QR:", qr_url[0])
+    print(Fore.CYAN  + "[🔗] Enlace al QR:", qr_url[0])
 
-    # Descargar y mostrar el QR
-
-    # Descargar la imagen del QR
+    # Descargar y guardar el QR
     qr_response = requests.get(qr_url[0])
     vprint(Fore.MAGENTA + f"[DEBUG] Respuesta descarga QR: {qr_response.status_code}")
+
     if qr_response.status_code == 200:
-        # Extraer el parámetro tipo D250706123227173 del enlace
         match = re.search(r"D(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", qr_url[0])
         if match:
-            # Construir fecha en formato YYYYMMDD_HHMM
-            year = '20' + match.group(1)  # "25" -> "2025"
-            month = match.group(2)        # "07"
-            day = match.group(3)          # "06"
-            hour = match.group(4)         # "12"
-            minute = match.group(5)       # "32"
-            fecha_str = f"{year}{month}{day}_{hour}{minute}"
+            year       = '20' + match.group(1)
+            month      = match.group(2)
+            day        = match.group(3)
+            hour       = match.group(4)
+            minute     = match.group(5)
+            fecha_str  = f"{year}{month}{day}_{hour}{minute}"
             nombre_archivo = f"{fecha_str}.png"
         else:
             nombre_archivo = 'qr_sin_fecha.png'
-        # Crear carpeta basicQRs en el directorio anterior si no existe
+
         carpeta_qr = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'basicQRs'))
         if not os.path.exists(carpeta_qr):
             os.makedirs(carpeta_qr)
+
         ruta_archivo = os.path.join(carpeta_qr, nombre_archivo)
-        # Convertir la respuesta a una imagen
-        qr_image = Image.open(BytesIO(qr_response.content))
-        # Guardar la imagen en la carpeta basicQRs con el nombre adecuado
+        qr_image     = Image.open(BytesIO(qr_response.content))
         qr_image.save(ruta_archivo)
         print(Fore.YELLOW + f"[📱] Código QR guardado como '{ruta_archivo}'")
     else:
@@ -188,23 +204,22 @@ def generar_cuenta():
 
     return True
 
-# Bucle principal
+# ── BUCLE PRINCIPAL ───────────────────────────────────────────────────────────
 while True:
     print(Fore.CYAN + f"\n[🔄] Iniciando generación de cuenta - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     exito = generar_cuenta()
+
     if exito:
         print(Fore.GREEN + f"\n[✅] Proceso completado")
     else:
         print(Fore.RED + "\n[❌] Error en el proceso. Se reintentará en el siguiente intervalo...")
+
     if args.time:
         print(Fore.GREEN + f"[⏳] Próxima ejecución en {intervalo_horas} horas")
-        # Iniciar animación en un hilo separado
-        animacion_thread = threading.Thread(target=animacion_espera)
+        animacion_thread        = threading.Thread(target=animacion_espera)
         animacion_thread.daemon = True
         animacion_thread.start()
-        # Esperar el intervalo especificado
         time.sleep(intervalo_horas * 3600)
-        # Limpiar la línea de la animación
         sys.stdout.write('\r' + ' ' * 50 + '\r')
         sys.stdout.flush()
     else:
