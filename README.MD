@@ -1,19 +1,23 @@
-# 🏋️‍♂️ Basic-FIT QR Generator
+# Basic-FIT Generator
 
-Generador automático de códigos QR para Basic-FIT con soporte para ejecución continua o única.
+Generador automático de cuentas y códigos QR para Basic-Fit con dos modos de funcionamiento:
 
-## 📋 Requisitos
+- Modo app: crea un correo temporal, registra la cuenta y completa el proceso de establecimiento de contraseña.
+- Modo qr: crea un correo temporal y recupera el código QR desde el correo recibido.
+
+## Requisitos
 
 - Python 3.x
 - Conexión a Internet
-- Las siguientes bibliotecas de Python:
+- Dependencias de Python:
   - requests
   - colorama
   - beautifulsoup4
   - pillow
   - qrcode
+  - rich
 
-## 🚀 Instalación
+## Instalación
 
 1. Clona este repositorio:
 ```bash
@@ -26,52 +30,63 @@ cd basicFITgenerator
 pip install -r requirements.txt
 ```
 
-## 💻 Uso
+## Uso
 
-El script puede ejecutarse de dos formas:
-
-### Modo una sola ejecución
+### Modo app
 ```bash
-python basicFITgenerator.py
+python basicFITgenerator.py app
 ```
-Esto generará un solo código QR y terminará.
+Este modo crea un correo temporal, registra la cuenta en Basic-Fit, espera al correo de restablecimiento de contraseña y finaliza mostrando las credenciales generadas.
 
-### Modo continuo
+### Modo qr
 ```bash
-python basicFITgenerator.py -t 8
+python basicFITgenerator.py qr
 ```
-Esto generará códigos QR cada 8 horas.
+Este modo crea un correo temporal, registra la cuenta y recupera el código QR desde el correo recibido.
 
-### Opciones disponibles
+### Ejecución repetida en modo qr
+```bash
+python basicFITgenerator.py qr -t 12
+```
+Esto repite el proceso cada 12 horas.
 
-- `-t, --time`: Tiempo en horas entre cada generación (por defecto: 8)
-- `-n, --name`: Nombre para la cuenta (por defecto: Joan)
-- `-l, --lastname`: Apellido para la cuenta (por defecto: Pradells)
-- `-d, --date`: Fecha de nacimiento en formato YYYY-MM-DD (por defecto: 1996-12-23)
+## Opciones disponibles
 
-### Ejemplos
+- `mode`: obligatorio. Valores: `app` o `qr`
+- `-t, --time`: tiempo en horas entre ejecuciones (por defecto: 8)
+- `-n, --name`: nombre para la cuenta (por defecto: Joan)
+- `-l, --lastname`: apellido para la cuenta (por defecto: Pradells)
+- `-d, --date`: fecha de nacimiento en formato YYYY-MM-DD (por defecto: 1996-12-23)
+- `-e, --email`: correo personalizado (opcional, actualmente no se usa en el flujo de app)
+- `-c, --campaign-id`: campaign ID personalizado (por defecto: vacío)
+- `-v, --verbose`: muestra información detallada de las peticiones y respuestas
+
+## Ejemplos
 
 ```bash
-# Usar valores por defecto
-python basicFITgenerator.py
+# Modo app completo
+python basicFITgenerator.py app
 
-# Ejecutar cada 12 horas
-python basicFITgenerator.py -t 12
+# Modo qr cada 12 horas
+python basicFITgenerator.py qr -t 12
 
-# Personalizar datos
-python basicFITgenerator.py -n "Juan" -l "García" -d "1995-05-15"
+# Modo qr con datos personalizados
+python basicFITgenerator.py qr -n "Juan" -l "García" -d "1995-05-15"
+
+# Modo app con campaign ID personalizado
+python basicFITgenerator.py app -c "mi-campaign-id"
 ```
 
-## 📝 Notas
+## Notas
 
-- El código QR se guarda como `last_qr.png` en el directorio actual
-- El script utiliza correos temporales para el registro
-- Se puede interrumpir el proceso en cualquier momento con Ctrl+C
+- La salida está formateada con Rich y paneles para una experiencia más limpia en consola.
+- El código QR se guarda en un directorio `basicQRs` junto al proyecto.
+- Se puede interrumpir el proceso en cualquier momento con Ctrl+C.
 
-## ⚠️ Advertencia
+## Advertencia
 
-Este script es solo para fines educativos. Úsalo de manera responsable y respetando los términos de servicio de Basic-FIT.
+Este script es solo para fines educativos. Úsalo de manera responsable y respetando los términos de servicio de Basic-Fit.
 
-## 📄 Licencia
+## Licencia
 
-Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles. 
+Este proyecto está bajo la Licencia MIT. Ver el archivo LICENSE para más detalles.
